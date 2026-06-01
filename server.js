@@ -28,3 +28,4 @@ app.get('/api/call/good', (req, res) => handleAgentCall(GOOD_AGENT_ID, res));
 app.get('/api/call/bad', (req, res) => handleAgentCall(BAD_AGENT_ID, res));
 const PORT = process.env.PORT || 3001;
 initValiron().then(() => app.listen(PORT, () => console.log('Server running on port ' + PORT)));
+app.use(require('express').static('.'));
