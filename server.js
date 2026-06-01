@@ -33,35 +33,43 @@ app.post('/api/register-agent', async (req, res) => {
     const agentAddress = wallet.address;
     console.log('Step 1: wallet', agentAddress);
     console.log('Step 2: calling Valiron wrapper...');
-    const firstCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', { headers: { 'x-agent-id': agentAddress } });
-    const firstResponse = await firstCall.json();
-    console.log('Step 2 status:', firstCall.status, JSON.stringify(firstResponse).slice(0,150));
-    let verified = false, sessionToken = null, score = null, tier = null, riskLevel = null;
-    if (firstResponse.challenge || firstCall.status === 401) {
-      const challenge = firstResponse.challenge;
-      if (challenge) {
-        const signature = await wallet.signMessage(challenge);
-        console.log('Step 3: signed challenge, retrying...');
-        const secondCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', {
-          headers: { 'x-agent-id': agentAddress, 'x-agent-signature': signature, 'x-agent-challenge': challenge }
-        });
-        const secondResponse = await secondCall.json();
-        console.log('Step 4 status:', secondCall.status, JSON.stringify(secondResponse).slice(0,200));
-        sessionToken = secondCall.headers.get('x-agent-session');
-        verified = secondCall.status === 200 || !!sessionToken;
+    const firstCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', {
+      headers: {
+        'x-agent-address': agentAddress,
+        'x-agent-id': agentAddress,
       }
+    });
+    const firstBody = await firstCall.text();
+    console.log('Step 2 status:', firstCall.status, firstBody.slice(0,200));
+    let firstResponse;
+    try { firstResponse = JSON.parse(firstBody); } catch(e) { firstResponse = {}; }
+    let verified = false, score = null, tier = null, riskLevel = null;
+    if (firstResponse.challenge) {
+      console.log('Step 3: signing challenge...');
+      const signature = await wallet.signMessage(firstResponse.challenge);
+      const secondCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', {
+        headers: {
+          'x-agent-address': agentAddress,
+          'x-agent-id': agentAddress,
+          'x-agent-signature': signature,
+          'x-agent-challenge': firstResponse.challenge,
+        }
+      });
+      const secondBody = await secondCall.text();
+      console.log('Step 4 status:', secondCall.status, secondBody.slice(0,200));
+      verified = secondCall.status === 200;
+      const vTier = secondCall.headers.get('x-valiron-tier');
+      const vRoute = secondCall.headers.get('x-valiron-route');
+      const vScore = secondCall.headers.get('x-valiron-score');
+      console.log('Valiron headers:', vTier, vRoute, vScore);
+      if (vTier) tier = vTier;
+      if (vScore) score = parseInt(vScore);
     } else if (firstCall.status === 200) {
       verified = true;
-      sessionToken = firstCall.headers.get('x-agent-session');
+      tier = firstCall.headers.get('x-valiron-tier');
+      score = parseInt(firstCall.headers.get('x-valiron-score'));
     }
-    try {
-      const profile = await valiron.getWalletProfile(agentAddress);
-      score = profile?.localReputation?.score;
-      tier = profile?.localReputation?.tier;
-      riskLevel = profile?.localReputation?.riskLevel;
-      console.log('Profile:', tier, score, riskLevel);
-    } catch(e) { console.log('Profile error:', e.message); }
-    res.json({ success: true, verified, agent: { name: agentName, type: agentType, description, address: agentAddress, score, tier, riskLevel, route: verified ? (score > 70 ? 'prod' : 'prod_throttled') : 'sandbox', sandboxRan: verified, createdAt: new Date().toISOString() }});
+    res.json({ success: true, verified, agent: { name: agentName, type: agentType, description, address: agentAddress, score, tier, riskLevel, route: verified ? 'prod' : 'sandbox', sandboxRan: verified, createdAt: new Date().toISOString() }});
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 const PORT = process.env.PORT || 3001;
