@@ -13,7 +13,7 @@ async function init() {
 }
 const GOOD_AGENT_ID = '25459';
 const BAD_AGENT_ID = '8348';
-const VALIRON_WRAPPER = 'https://valiron-edge-proxy.onrender.com/wrap/f89c87a0-caee-4b69-b402-1008b34c94fa/crypto-price';
+const VALIRON_WRAPPER = 'https://valiron-edge-proxy.onrender.com/wrap/f89c87a0-caee-4b69-b402-1008b34c94fa/crypto-free';
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 async function handleAgentCall(agentId, res) {
   try {
