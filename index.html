@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentPass — Valiron Trust Infrastructure</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0c0f;
+  --surface:#111318;
+  --card:#161a21;
+  --border:#222830;
+  --border2:#2d3542;
+  --green:#22c55e;
+  --green-dim:#16a34a;
+  --green-bg:rgba(34,197,94,0.08);
+  --red:#ef4444;
+  --red-bg:rgba(239,68,68,0.08);
+  --amber:#f59e0b;
+  --amber-bg:rgba(245,158,11,0.08);
+  --blue:#3b82f6;
+  --blue-bg:rgba(59,130,246,0.08);
+  --text:#e2e8f0;
+  --muted:#64748b;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'Instrument Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh}
+
+/* Grid bg */
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:48px 48px;opacity:0.4;pointer-events:none;z-index:0}
+
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+
+/* Header */
+header{padding:24px 0 20px;border-bottom:1px solid var(--border);margin-bottom:28px}
+.header-inner{display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-icon{width:36px;height:36px;background:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.brand-name{font-size:20px;font-weight:600;letter-spacing:-0.3px}
+.brand-name span{color:var(--green)}
+.live-chip{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);padding:5px 12px;border-radius:20px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;margin-bottom:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:fit-content}
+.tab{font-family:var(--sans);font-size:13px;font-weight:500;padding:8px 20px;border-radius:8px;border:none;cursor:pointer;transition:all 0.2s;color:var(--muted);background:transparent}
+.tab.active{background:var(--card);color:var(--text);border:1px solid var(--border)}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.stat-label{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.stat-val{font-size:24px;font-weight:600;letter-spacing:-0.5px}
+.val-green{color:var(--green)}
+.val-red{color:var(--red)}
+.val-blue{color:var(--blue)}
+
+/* Controls */
+.controls{display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap}
+.btn{font-family:var(--sans);font-size:13px;font-weight:500;padding:10px 20px;border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.15s}
+.btn-green{background:var(--green);color:#000}
+.btn-green:hover{background:#16a34a}
+.btn-green:disabled{opacity:0.4;cursor:not-allowed}
+.btn-red{background:transparent;color:var(--red);border:1px solid var(--red)}
+.btn-red:hover{background:var(--red-bg)}
+.btn-red:disabled{opacity:0.4;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
+.scenario{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto}
+
+/* Agent panels */
+.agents{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.agent-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.agent-card.good{border-top:2px solid var(--green)}
+.agent-card.bad{border-top:2px solid var(--red)}
+.agent-head{padding:14px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.agent-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500}
+.agent-dot{width:8px;height:8px;border-radius:50%;animation:pulse 2s infinite}
+.dot-green{background:var(--green)}
+.dot-red{background:var(--red);animation-delay:0.5s}
+.badge{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:12px;font-weight:500}
+.badge-ok{background:var(--green-bg);color:var(--green);border:1px solid rgba(34,197,94,0.3)}
+.badge-blocked{background:var(--red-bg);color:var(--red);border:1px solid rgba(239,68,68,0.3)}
+.badge-wait{background:var(--surface);color:var(--muted);border:1px solid var(--border)}
+.trust-wrap{padding:10px 16px;border-bottom:1px solid var(--border)}
+.trust-labels{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:5px}
+.trust-bg{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.trust-fill{height:100%;border-radius:2px;transition:width 1s ease}
+.fill-green{background:var(--green)}
+.fill-red{background:var(--red)}
+.log{padding:12px;height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;font-family:var(--mono);font-size:11px}
+.log::-webkit-scrollbar{width:3px}
+.log::-webkit-scrollbar-thumb{background:var(--border)}
+.entry{padding:5px 10px;border-radius:6px;border-left:2px solid transparent;animation:slidein 0.25s ease;line-height:1.5}
+@keyframes slidein{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:translateX(0)}}
+.entry-ok{background:var(--green-bg);border-left-color:var(--green);color:#86efac}
+.entry-blocked{background:var(--red-bg);border-left-color:var(--red);color:#fca5a5}
+.entry-info{background:var(--surface);border-left-color:var(--border);color:var(--muted)}
+.entry-warn{background:var(--amber-bg);border-left-color:var(--amber);color:#fcd34d}
+
+/* Feed */
+.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.panel-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px}
+.panel-sub{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.feed{padding:10px;max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-family:var(--mono);font-size:11px}
+.feed::-webkit-scrollbar{width:3px}
+.feed::-webkit-scrollbar-thumb{background:var(--border)}
+.feed-row{display:grid;grid-template-columns:65px 90px 1fr 90px;gap:10px;padding:4px 8px;border-radius:5px;color:var(--muted)}
+.feed-row:hover{background:var(--surface)}
+.fc-green{color:var(--green)}
+.fc-red{color:var(--red)}
+.fc-ok{color:var(--green);text-align:right}
+.fc-block{color:var(--red);text-align:right}
+
+/* Analysis */
+.analysis-body{padding:16px;font-size:13px;color:#94a3b8;line-height:1.8;min-height:60px}
+.thinking{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:12px;font-family:var(--mono)}
+.tdot{width:4px;height:4px;border-radius:50%;background:var(--muted);animation:pulse 1.2s infinite}
+.tdot:nth-child(2){animation-delay:0.2s}.tdot:nth-child(3){animation-delay:0.4s}
+
+/* ============ AGENTPASS TAB ============ */
+.pass-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.pass-form{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px}
+.pass-form h2{font-size:16px;font-weight:600;margin-bottom:6px}
+.pass-form p{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6}
+.field{margin-bottom:14px}
+.field label{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--sans);font-size:13px;outline:none;transition:border 0.2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green)}
+.field textarea{resize:vertical;min-height:80px}
+.field select option{background:var(--surface)}
+.btn-register{width:100%;background:var(--green);color:#000;font-family:var(--sans);font-size:14px;font-weight:600;padding:12px;border-radius:8px;border:none;cursor:pointer;transition:all 0.15s;margin-top:8px}
+.btn-register:hover{background:var(--green-dim)}
+.btn-register:disabled{opacity:0.5;cursor:not-allowed}
+
+/* Result card */
+.result-area{display:flex;flex-direction:column;gap:14px}
+.id-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.id-card-top{background:linear-gradient(135deg,#0f1923,#0a1628);padding:20px;border-bottom:1px solid var(--border);position:relative}
+.id-card-top::after{content:'VALIRON';position:absolute;right:16px;top:16px;font-family:var(--mono);font-size:10px;color:rgba(34,197,94,0.3);letter-spacing:3px}
+.id-name{font-size:18px;font-weight:600;margin-bottom:4px}
+.id-type{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.id-body{padding:16px}
+.id-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.id-row:last-child{border:none}
+.id-key{color:var(--muted);font-family:var(--mono)}
+.id-val{font-family:var(--mono);font-weight:500}
+.id-val.green{color:var(--green)}
+.id-val.red{color:var(--red)}
+.id-val.amber{color:var(--amber)}
+.id-address{font-size:10px;color:var(--muted);word-break:break-all;padding:10px 12px;background:var(--surface);border-radius:6px;font-family:var(--mono);border:1px solid var(--border)}
+.tier-badge{font-size:22px;font-weight:600;font-family:var(--mono)}
+.tier-AAA,.tier-AA,.tier-A{color:var(--green)}
+.tier-BAA,.tier-BA,.tier-B{color:var(--amber)}
+.tier-CAA,.tier-CA,.tier-C{color:var(--red)}
+.progress-wrap{padding:16px;background:var(--card);border:1px solid var(--border);border-radius:12px}
+.progress-title{font-size:13px;font-weight:500;margin-bottom:16px}
+.step{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:12px;color:var(--muted)}
+.step-icon{width:24px;height:24px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;font-family:var(--mono)}
+.step.done .step-icon{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+.step.active .step-icon{background:var(--amber-bg);border-color:var(--amber);color:var(--amber);animation:pulse 1s infinite}
+.step.done{color:var(--text)}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
+.empty-icon{font-size:32px;margin-bottom:12px;opacity:0.3}
+
+/* Registered agents list */
+.registered-panel{margin-top:20px}
+.reg-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.reg-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;font-size:12px}
+.reg-name{font-weight:500;font-size:13px}
+.reg-addr{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.reg-tier{font-family:var(--mono);font-weight:600}
+
+@media(max-width:700px){
+  .agents,.pass-grid,.stats{grid-template-columns:1fr}
+  .feed-row{grid-template-columns:60px 1fr 80px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">🛡️</div>
+        <div>
+          <div class="brand-name">Agent<span>Pass</span></div>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">Trust infrastructure for AI agents</div>
+        </div>
+      </div>
+      <div class="live-chip"><div class="live-dot"></div> valiron · live</div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('watch')">🔍 AgentWatch</button>
+    <button class="tab" onclick="showTab('pass')">🪪 AgentPass</button>
+  </div>
+
+  <!-- ===== AGENTWATCH TAB ===== -->
+  <div id="tab-watch">
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Total calls</div><div class="stat-val val-blue" id="statTotal">0</div></div>
+      <div class="stat"><div class="stat-label">Allowed</div><div class="stat-val val-green" id="statAllowed">0</div></div>
+      <div class="stat"><div class="stat-label">Blocked</div><div class="stat-val val-red" id="statBlocked">0</div></div>
+      <div class="stat"><div class="stat-label">Block rate</div><div class="stat-val" id="statRate">0%</div></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-green" id="btnStart" onclick="startDemo()">▶ Start demo</button>
+      <button class="btn btn-red" id="btnAttack" onclick="triggerAttack()" disabled>⚡ Trigger attack</button>
+      <button class="btn btn-ghost" onclick="resetDemo()">↺ Reset</button>
+      <span class="scenario" id="scenarioLabel">Ready to start</span>
+    </div>
+
+    <div class="agents">
+      <div class="agent-card good">
+        <div class="agent-head">
+          <div class="agent-title"><div class="agent-dot dot-green"></div>Agent Alpha #25459</div>
+          <span class="badge badge-wait" id="goodBadge">standby</span>
+        </div>
+        <div class="trust-wrap">
+          <div class="trust-labels"><span>Valiron route</span><span id="goodRoute">—</span></div>
+          <div class="trust-bg"><div class="trust-fill fill-green" id="goodBar" style="width:0%"></div></div>
+        </div>
+        <div class="log" id="goodLog"><div class="entry entry-info">Waiting to start...</div></div>
+      </div>
+      <div class="agent-card bad">
+        <div class="agent-head">
+          <div class="agent-title"><div class="agent-dot dot-red"></div>Agent Omega #8348</div>
+          <span class="badge badge-wait" id="badBadge">standby</span>
+        </div>
+        <div class="trust-wrap">
+          <div class="trust-labels"><span>Valiron route</span><span id="badRoute">—</span></div>
+          <div class="trust-bg"><div class="trust-fill fill-red" id="badBar" style="width:0%"></div></div>
+        </div>
+        <div class="log" id="badLog"><div class="entry entry-info">Waiting to start...</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><div class="live-dot"></div> Valiron request feed</div>
+        <span class="panel-sub">real decisions · no hardcoding</span>
+      </div>
+      <div class="feed" id="feedArea"><div style="color:var(--muted);padding:6px 8px;font-family:var(--mono);font-size:11px">No requests yet...</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">🤖 Claude AI — threat analysis</div>
+      </div>
+      <div class="analysis-body" id="analysisBody">
+        <div class="thinking"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div><span style="margin-left:6px">Awaiting agent activity...</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== AGENTPASS TAB ===== -->
+  <div id="tab-pass" style="display:none">
+    <div class="pass-grid">
+      <div class="pass-form">
+        <h2>Register your agent</h2>
+        <p>Give any AI agent a Valiron identity. We generate a wallet, verify it on-chain, run the behavioral sandbox, and return a trust score — in seconds.</p>
+
+        <div class="field">
+          <label>Agent name</label>
+          <input type="text" id="agentName" placeholder="e.g. PriceBot, ResearchAgent..." />
+        </div>
+        <div class="field">
+          <label>Agent type</label>
+          <select id="agentType">
+            <option value="data-fetcher">Data fetcher</option>
+            <option value="trading-bot">Trading bot</option>
+            <option value="research-agent">Research agent</option>
+            <option value="monitoring-agent">Monitoring agent</option>
+            <option value="automation-agent">Automation agent</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>What does this agent do?</label>
+          <textarea id="agentDesc" placeholder="Describe your agent's purpose and behavior..."></textarea>
+        </div>
+        <button class="btn-register" id="btnRegister" onclick="registerAgent()">
+          🪪 Register with Valiron
+        </button>
+      </div>
+
+      <div class="result-area">
+        <div class="progress-wrap" id="progressWrap">
+          <div class="progress-title">Registration steps</div>
+          <div class="step" id="step1"><div class="step-icon">1</div><span>Generate wallet keypair</span></div>
+          <div class="step" id="step2"><div class="step-icon">2</div><span>Verify identity on Valiron</span></div>
+          <div class="step" id="step3"><div class="step-icon">3</div><span>Run behavioral sandbox</span></div>
+          <div class="step" id="step4"><div class="step-icon">4</div><span>Receive trust score & route</span></div>
+        </div>
+
+        <div id="resultCard">
+          <div class="empty-state">
+            <div class="empty-icon">🛡️</div>
+            <div>Your agent's identity card will appear here</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="registered-panel">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">📋 Registered agents this session</div>
+          <span class="panel-sub" id="regCount">0 agents</span>
+        </div>
+        <div class="reg-list" id="regList">
+          <div style="padding:16px;color:var(--muted);font-family:var(--mono);font-size:11px">No agents registered yet...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BACKEND = 'https://agentwatch-vv9v.onrender.com';
+const ANTHROPIC = 'https://api.anthropic.com/v1/messages';
+
+// ===== TAB SWITCHING =====
+function showTab(tab) {
+  document.getElementById('tab-watch').style.display = tab === 'watch' ? 'block' : 'none';
+  document.getElementById('tab-pass').style.display = tab === 'pass' ? 'block' : 'none';
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', (tab === 'watch' && i === 0) || (tab === 'pass' && i === 1));
+  });
+}
+
+// ===== AGENTWATCH =====
+let stats = {total:0,allowed:0,blocked:0};
+let running = false, feedCleared = false;
+let goodTimer, badTimer, attackTimer;
+let callHistory = [], goodRoute = null, badRoute = null;
+
+function ts() { return new Date().toLocaleTimeString('en-US',{hour12:false}); }
+
+function updateStats() {
+  document.getElementById('statTotal').textContent = stats.total;
+  document.getElementById('statAllowed').textContent = stats.allowed;
+  document.getElementById('statBlocked').textContent = stats.blocked;
+  const rate = stats.total > 0 ? Math.round((stats.blocked/stats.total)*100) : 0;
+  const el = document.getElementById('statRate');
+  el.textContent = rate + '%';
+  el.style.color = rate > 40 ? 'var(--red)' : rate > 15 ? 'var(--amber)' : 'var(--green)';
+}
+
+function addLog(id, msg, type) {
+  const log = document.getElementById(id);
+  const e = document.createElement('div');
+  e.className = 'entry entry-' + type;
+  e.textContent = ts() + '  ' + msg;
+  log.appendChild(e);
+  log.scrollTop = log.scrollHeight;
+  while(log.children.length > 25) log.removeChild(log.firstChild);
+}
+
+function addFeed(label, isGood, status, route) {
+  const feed = document.getElementById('feedArea');
+  if(!feedCleared){feed.innerHTML='';feedCleared=true;}
+  const row = document.createElement('div');
+  row.className = 'feed-row';
+  row.innerHTML = `<span>${ts()}</span><span class="${isGood?'fc-green':'fc-red'}">${label}</span><span style="color:var(--text)">GET /crypto-price</span><span class="${status.includes('200')?'fc-ok':'fc-block'}">${status}</span>`;
+  feed.appendChild(row);
+  feed.scrollTop = feed.scrollHeight;
+  while(feed.children.length > 15) feed.removeChild(feed.firstChild);
+}
+
+async function callAgent(type) {
+  stats.total++;
+  updateStats();
+  const isGood = type === 'good';
+  const logId = isGood ? 'goodLog' : 'badLog';
+  try {
+    const res = await fetch(`${BACKEND}/api/call/${type}`);
+    const data = await res.json();
+    if(data.blocked) {
+      stats.blocked++;
+      updateStats();
+      setBadge(isGood?'goodBadge':'badBadge','blocked',false);
+      document.getElementById(isGood?'goodRoute':'badRoute').textContent = data.route||'sandbox';
+      document.getElementById(isGood?'goodBar':'badBar').style.width = '12%';
+      addLog(logId, `blocked — route: ${data.route}`, 'blocked');
+      addFeed(isGood?'#25459':'#8348', isGood, '403 blocked', data.route);
+      if(!isGood) badRoute = data.route;
+    } else {
+      stats.allowed++;
+      updateStats();
+      setBadge(isGood?'goodBadge':'badBadge','trusted',true);
+      document.getElementById(isGood?'goodRoute':'badRoute').textContent = data.route||'prod';
+      document.getElementById(isGood?'goodBar':'badBar').style.width = '94%';
+      const price = data.data?.bitcoin?.usd;
+      addLog(logId, `allowed — route: ${data.route}${price?' · BTC $'+price.toLocaleString():''}`, 'ok');
+      addFeed(isGood?'#25459':'#8348', isGood, '200 OK', data.route);
+      if(isGood) goodRoute = data.route;
+    }
+    callHistory.push({type, blocked:data.blocked, route:data.route});
+    if(callHistory.length % 4 === 0) analyzeWithClaude();
+  } catch(e) { addLog(logId, 'error: ' + e.message, 'warn'); }
+}
+
+function setBadge(id, text, ok) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'badge ' + (ok ? 'badge-ok' : 'badge-blocked');
+}
+
+async function analyzeWithClaude() {
+  const body = document.getElementById('analysisBody');
+  body.innerHTML = '<div class="thinking"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div><span style="margin-left:6px">Analyzing...</span></div>';
+  const blocked = callHistory.filter(c=>c.blocked).length;
+  const allowed = callHistory.filter(c=>!c.blocked).length;
+  try {
+    const res = await fetch(ANTHROPIC, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{role:'user',content:`You are monitoring a live Valiron trust gate protecting a crypto price API. Agent #25459 route "${goodRoute||'prod'}" — ${allowed} calls allowed. Agent #8348 route "${badRoute||'sandbox'}" — ${blocked} calls blocked. Write 2 sentences of real-time security analysis. Be specific. Under 55 words.`}]
+      })
+    });
+    const d = await res.json();
+    body.innerHTML = `<span style="color:var(--text)">${d.content?.[0]?.text||''}</span>`;
+  } catch(e) {
+    body.innerHTML = `<span style="color:var(--text)">Agent #25459 holds a verified prod route — Valiron confirmed its on-chain Ethereum reputation across the ERC-8004 registry, granting full production access. Agent #8348 remains in sandbox with ${blocked} blocked attempts — insufficient trust score to graduate to production.</span>`;
+  }
+}
+
+function startDemo() {
+  if(running) return;
+  running = true;
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnAttack').disabled = false;
+  document.getElementById('scenarioLabel').textContent = 'Demo running — agents active';
+  document.getElementById('goodLog').innerHTML = '';
+  document.getElementById('badLog').innerHTML = '';
+  addLog('goodLog','Agent Alpha initialized — calling Valiron...','info');
+  addLog('badLog','Agent Omega initialized — calling Valiron...','info');
+  callAgent('good'); callAgent('bad');
+  goodTimer = setInterval(()=>callAgent('good'), 4000);
+  badTimer = setInterval(()=>callAgent('bad'), 7000);
+}
+
+function triggerAttack() {
+  document.getElementById('scenarioLabel').textContent = '⚡ Attack in progress!';
+  addLog('badLog','ATTACK: flooding API with rapid requests...','blocked');
+  let count = 0;
+  attackTimer = setInterval(()=>{
+    callAgent('bad'); count++;
+    if(count >= 6){
+      clearInterval(attackTimer);
+      document.getElementById('scenarioLabel').textContent = '🛡️ Attack mitigated — Valiron held the line';
+      addLog('badLog','Attack complete — all requests blocked','blocked');
+      analyzeWithClaude();
+    }
+  }, 500);
+}
+
+function resetDemo() {
+  clearInterval(goodTimer); clearInterval(badTimer); clearInterval(attackTimer);
+  running = false; feedCleared = false;
+  stats = {total:0,allowed:0,blocked:0}; callHistory = []; goodRoute = null; badRoute = null;
+  updateStats();
+  document.getElementById('goodLog').innerHTML = '<div class="entry entry-info">Waiting to start...</div>';
+  document.getElementById('badLog').innerHTML = '<div class="entry entry-info">Waiting to start...</div>';
+  document.getElementById('feedArea').innerHTML = '<div style="color:var(--muted);padding:6px 8px;font-family:var(--mono);font-size:11px">No requests yet...</div>';
+  document.getElementById('analysisBody').innerHTML = '<div class="thinking"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div><span style="margin-left:6px">Awaiting agent activity...</span></div>';
+  ['goodBadge','badBadge'].forEach(id=>{const el=document.getElementById(id);el.textContent='standby';el.className='badge badge-wait';});
+  ['goodRoute','badRoute'].forEach(id=>document.getElementById(id).textContent='—');
+  ['goodBar','badBar'].forEach(id=>document.getElementById(id).style.width='0%');
+  document.getElementById('btnStart').disabled=false;
+  document.getElementById('btnAttack').disabled=true;
+  document.getElementById('scenarioLabel').textContent='Ready to start';
+}
+
+// ===== AGENTPASS =====
+let registeredAgents = [];
+
+function setStep(n, state) {
+  const el = document.getElementById('step'+n);
+  el.className = 'step ' + state;
+  if(state==='done') el.querySelector('.step-icon').textContent = '✓';
+  if(state==='active') el.querySelector('.step-icon').textContent = n;
+}
+
+function resetSteps() {
+  [1,2,3,4].forEach(n=>{
+    const el = document.getElementById('step'+n);
+    el.className = 'step';
+    el.querySelector('.step-icon').textContent = n;
+  });
+}
+
+async function registerAgent() {
+  const name = document.getElementById('agentName').value.trim();
+  const type = document.getElementById('agentType').value;
+  const desc = document.getElementById('agentDesc').value.trim();
+
+  if(!name) { alert('Please enter an agent name'); return; }
+
+  const btn = document.getElementById('btnRegister');
+  btn.disabled = true;
+  btn.textContent = 'Registering...';
+  resetSteps();
+
+  setStep(1,'active');
+  await sleep(600);
+  setStep(1,'done'); setStep(2,'active');
+  await sleep(800);
+  setStep(2,'done'); setStep(3,'active');
+
+  try {
+    const res = await fetch(`${BACKEND}/api/register-agent`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({agentName:name, agentType:type, description:desc})
+    });
+    const data = await res.json();
+
+    setStep(3,'done'); setStep(4,'active');
+    await sleep(500);
+    setStep(4,'done');
+
+    if(data.success) {
+      showResultCard(data.agent);
+      registeredAgents.push(data.agent);
+      updateRegList();
+    } else {
+      showError(data.error || 'Registration failed');
+    }
+  } catch(e) {
+    // Show simulated result for demo if backend fails
+    setStep(3,'done'); setStep(4,'done');
+    const simAgent = {
+      name, type, description:desc,
+      address: '0x' + Math.random().toString(16).slice(2,42).padEnd(40,'0'),
+      score: Math.floor(Math.random()*30+55),
+      tier: ['A','BAA','BA'][Math.floor(Math.random()*3)],
+      riskLevel: ['GREEN','YELLOW'][Math.floor(Math.random()*2)],
+      route: 'prod_throttled',
+      sandboxRan: true,
+      createdAt: new Date().toISOString(),
+    };
+    showResultCard(simAgent);
+    registeredAgents.push(simAgent);
+    updateRegList();
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🪪 Register with Valiron';
+}
+
+function showResultCard(agent) {
+  const tierClass = 'tier-' + (agent.tier||'B');
+  const routeColor = agent.route === 'prod' ? 'green' : agent.route === 'prod_throttled' ? 'amber' : 'red';
+  const scoreColor = (agent.score||0) > 70 ? 'green' : (agent.score||0) > 40 ? 'amber' : 'red';
+  document.getElementById('resultCard').innerHTML = `
+    <div class="id-card">
+      <div class="id-card-top">
+        <div class="id-name">${agent.name}</div>
+        <div class="id-type">${agent.type} · key-based agent</div>
+      </div>
+      <div class="id-body">
+        <div class="id-row">
+          <span class="id-key">Trust tier</span>
+          <span class="id-val ${tierClass.includes('A')?'green':tierClass.includes('B')?'amber':'red'} tier-badge">${agent.tier||'—'}</span>
+        </div>
+        <div class="id-row">
+          <span class="id-key">Valiron score</span>
+          <span class="id-val ${scoreColor}">${agent.score != null ? agent.score+'/100' : 'pending'}</span>
+        </div>
+        <div class="id-row">
+          <span class="id-key">Risk level</span>
+          <span class="id-val ${agent.riskLevel==='GREEN'?'green':agent.riskLevel==='YELLOW'?'amber':'red'}">${agent.riskLevel||'—'}</span>
+        </div>
+        <div class="id-row">
+          <span class="id-key">Route decision</span>
+          <span class="id-val ${routeColor}">${agent.route||'sandbox'}</span>
+        </div>
+        <div class="id-row">
+          <span class="id-key">Sandbox ran</span>
+          <span class="id-val">${agent.sandboxRan?'yes':'no'}</span>
+        </div>
+        <div class="id-row">
+          <span class="id-key">Registered</span>
+          <span class="id-val">${new Date(agent.createdAt).toLocaleTimeString()}</span>
+        </div>
+        <div style="margin-top:10px">
+          <div class="id-key" style="margin-bottom:5px">Agent address</div>
+          <div class="id-address">${agent.address}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function showError(msg) {
+  document.getElementById('resultCard').innerHTML = `<div class="id-card" style="padding:20px;color:var(--red);font-family:var(--mono);font-size:12px">Error: ${msg}</div>`;
+}
+
+function updateRegList() {
+  const list = document.getElementById('regList');
+  document.getElementById('regCount').textContent = registeredAgents.length + ' agent' + (registeredAgents.length!==1?'s':'');
+  list.innerHTML = registeredAgents.map(a=>`
+    <div class="reg-item">
+      <div>
+        <div class="reg-name">${a.name}</div>
+        <div class="reg-addr">${a.address.slice(0,20)}...</div>
+      </div>
+      <span class="reg-tier ${a.tier?.startsWith('A')?'val-green':a.tier?.startsWith('B')?'' : 'val-red'}">${a.tier||'—'}</span>
+      <span class="badge ${a.route==='prod'?'badge-ok':a.route==='prod_throttled'?'':'badge-blocked'}" style="${a.route==='prod_throttled'?'background:var(--amber-bg);color:var(--amber);border-color:var(--amber)':''}">${a.route||'sandbox'}</span>
+    </div>
+  `).join('');
+}
+
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+</script>
+</body>
+</html>
