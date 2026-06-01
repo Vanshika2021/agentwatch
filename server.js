@@ -8,11 +8,12 @@ let valiron, ethers;
 async function init() {
   const { ValironSDK } = await import('@valiron/sdk');
   ethers = await import('ethers');
-  valiron = new ValironSDK({ apiKey: 'val_op_fe62e9f017d79f18c592bb0ee2e89e3b06f45239475e104557b8679b8afb641d', chain: 'ethereum' });
+  valiron = new ValironSDK({ apiKey: 'val_op_fe62e9f017d79f18c592bb0ee2e89e3b06f45239475e104557b8679b8afb641d', chain: 'ethereum', timeout: 8000 });
   console.log('Valiron SDK initialized');
 }
 const GOOD_AGENT_ID = '25459';
 const BAD_AGENT_ID = '8348';
+const VALIRON_WRAPPER = 'https://valiron-edge-proxy.onrender.com/wrap/f89c87a0-caee-4b69-b402-1008b34c94fa/crypto-price';
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 async function handleAgentCall(agentId, res) {
   try {
@@ -31,22 +32,36 @@ app.post('/api/register-agent', async (req, res) => {
     const wallet = ethers.Wallet.createRandom();
     const agentAddress = wallet.address;
     console.log('Step 1: wallet', agentAddress);
-    let challengeOk = false;
+    console.log('Step 2: calling Valiron wrapper...');
+    const firstCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', { headers: { 'x-agent-address': agentAddress } });
+    const firstResponse = await firstCall.json();
+    console.log('Step 2 status:', firstCall.status, JSON.stringify(firstResponse).slice(0,150));
+    let verified = false, sessionToken = null, score = null, tier = null, riskLevel = null;
+    if (firstResponse.challenge || firstCall.status === 401) {
+      const challenge = firstResponse.challenge;
+      if (challenge) {
+        const signature = await wallet.signMessage(challenge);
+        console.log('Step 3: signed challenge, retrying...');
+        const secondCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', {
+          headers: { 'x-agent-address': agentAddress, 'x-agent-signature': signature, 'x-agent-challenge': challenge }
+        });
+        const secondResponse = await secondCall.json();
+        console.log('Step 4 status:', secondCall.status, JSON.stringify(secondResponse).slice(0,200));
+        sessionToken = secondCall.headers.get('x-agent-session');
+        verified = secondCall.status === 200 || !!sessionToken;
+      }
+    } else if (firstCall.status === 200) {
+      verified = true;
+      sessionToken = firstCall.headers.get('x-agent-session');
+    }
     try {
-      const cr = await valiron.getKeyAgentChallenge(agentAddress);
-      console.log('Step 2: challenge ok');
-      const sig = await wallet.signMessage(cr.challenge);
-      await valiron.verifyKeyAgent({ challenge: cr.challenge, signature: sig, agentAddress });
-      challengeOk = true;
-    } catch(e) { console.log('Step 2 error:', e.message, e.statusCode); }
-    let score=null,tier=null,riskLevel=null,sandboxRan=false;
-    try {
-      console.log('Step 3: triggering sandbox...');
-      const sb = await valiron.triggerKeyAgentSandbox(agentAddress);
-      console.log('Step 3 result:', JSON.stringify(sb));
-      score=sb.valironScore; tier=sb.tier; riskLevel=sb.riskLevel; sandboxRan=true;
-    } catch(e) { console.log('Step 3 error:', e.message, e.statusCode); }
-    res.json({ success:true, challengeOk, sandboxRan, agent:{ name:agentName, type:agentType, description, address:agentAddress, score, tier, riskLevel, route: riskLevel==='GREEN'?'prod':riskLevel==='YELLOW'?'prod_throttled':'sandbox', sandboxRan, createdAt:new Date().toISOString() }});
+      const profile = await valiron.getWalletProfile(agentAddress);
+      score = profile?.localReputation?.score;
+      tier = profile?.localReputation?.tier;
+      riskLevel = profile?.localReputation?.riskLevel;
+      console.log('Profile:', tier, score, riskLevel);
+    } catch(e) { console.log('Profile error:', e.message); }
+    res.json({ success: true, verified, agent: { name: agentName, type: agentType, description, address: agentAddress, score, tier, riskLevel, route: verified ? (score > 70 ? 'prod' : 'prod_throttled') : 'sandbox', sandboxRan: verified, createdAt: new Date().toISOString() }});
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 const PORT = process.env.PORT || 3001;
