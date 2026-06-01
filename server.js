@@ -32,44 +32,58 @@ app.post('/api/register-agent', async (req, res) => {
     const wallet = ethers.Wallet.createRandom();
     const agentAddress = wallet.address;
     console.log('Step 1: wallet', agentAddress);
-    console.log('Step 2: calling Valiron wrapper...');
-    const firstCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', {
-      headers: {
-        'x-agent-address': agentAddress,
-        'x-agent-id': agentAddress,
-      }
+
+    // Step 2: First call with just x-agent-address to get challenge
+    console.log('Step 2: getting challenge...');
+    const call1 = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', {
+      headers: { 'x-agent-address': agentAddress }
     });
-    const firstBody = await firstCall.text();
-    console.log('Step 2 status:', firstCall.status, firstBody.slice(0,200));
-    let firstResponse;
-    try { firstResponse = JSON.parse(firstBody); } catch(e) { firstResponse = {}; }
-    let verified = false, score = null, tier = null, riskLevel = null;
-    if (firstResponse.challenge) {
+    const body1 = await call1.json();
+    console.log('Step 2 response:', call1.status, JSON.stringify(body1).slice(0,200));
+
+    let verified = false, score = null, tier = null, riskLevel = null, sessionToken = null;
+
+    // Step 3: If challenge_required, sign it
+    if (body1.error === 'challenge_required' && body1.challenge) {
       console.log('Step 3: signing challenge...');
-      const signature = await wallet.signMessage(firstResponse.challenge);
-      const secondCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', {
+      const signature = await wallet.signMessage(body1.challenge);
+
+      // Step 4: Retry with all three headers
+      console.log('Step 4: retrying with signature...');
+      const call2 = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', {
         headers: {
           'x-agent-address': agentAddress,
-          'x-agent-id': agentAddress,
           'x-agent-signature': signature,
-          'x-agent-challenge': firstResponse.challenge,
+          'x-agent-challenge': body1.challenge,
         }
       });
-      const secondBody = await secondCall.text();
-      console.log('Step 4 status:', secondCall.status, secondBody.slice(0,200));
-      verified = secondCall.status === 200;
-      const vTier = secondCall.headers.get('x-valiron-tier');
-      const vRoute = secondCall.headers.get('x-valiron-route');
-      const vScore = secondCall.headers.get('x-valiron-score');
-      console.log('Valiron headers:', vTier, vRoute, vScore);
-      if (vTier) tier = vTier;
-      if (vScore) score = parseInt(vScore);
-    } else if (firstCall.status === 200) {
+      const body2 = await call2.json();
+      console.log('Step 4 response:', call2.status, JSON.stringify(body2).slice(0,200));
+
+      sessionToken = call2.headers.get('x-agent-session');
+      tier = call2.headers.get('x-valiron-tier');
+      score = call2.headers.get('x-valiron-score');
+      riskLevel = call2.headers.get('x-valiron-risk');
+      console.log('Headers:', { sessionToken, tier, score, riskLevel });
+      verified = call2.status === 200;
+
+    } else if (call1.status === 200) {
       verified = true;
-      tier = firstCall.headers.get('x-valiron-tier');
-      score = parseInt(firstCall.headers.get('x-valiron-score'));
+      tier = call1.headers.get('x-valiron-tier');
+      score = call1.headers.get('x-valiron-score');
     }
-    res.json({ success: true, verified, agent: { name: agentName, type: agentType, description, address: agentAddress, score, tier, riskLevel, route: verified ? 'prod' : 'sandbox', sandboxRan: verified, createdAt: new Date().toISOString() }});
+
+    res.json({
+      success: true, verified,
+      agent: {
+        name: agentName, type: agentType, description,
+        address: agentAddress, score: score ? parseInt(score) : null,
+        tier, riskLevel,
+        route: verified ? (tier?.startsWith('A') ? 'prod' : 'prod_throttled') : 'sandbox',
+        sandboxRan: verified,
+        createdAt: new Date().toISOString()
+      }
+    });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 const PORT = process.env.PORT || 3001;
