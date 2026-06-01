@@ -21,6 +21,7 @@
   "dependencies": {
     "@valiron/sdk": "^1.0.2",
     "cors": "^2.8.6",
+    "ethers": "^6.16.0",
     "express": "^5.2.1"
   }
 }
