@@ -33,7 +33,7 @@ app.post('/api/register-agent', async (req, res) => {
     const agentAddress = wallet.address;
     console.log('Step 1: wallet', agentAddress);
     console.log('Step 2: calling Valiron wrapper...');
-    const firstCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', { headers: { 'x-agent-address': agentAddress } });
+    const firstCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', { headers: { 'x-agent-id': agentAddress } });
     const firstResponse = await firstCall.json();
     console.log('Step 2 status:', firstCall.status, JSON.stringify(firstResponse).slice(0,150));
     let verified = false, sessionToken = null, score = null, tier = null, riskLevel = null;
@@ -43,7 +43,7 @@ app.post('/api/register-agent', async (req, res) => {
         const signature = await wallet.signMessage(challenge);
         console.log('Step 3: signed challenge, retrying...');
         const secondCall = await fetch(VALIRON_WRAPPER + '?ids=bitcoin&vs_currencies=usd', {
-          headers: { 'x-agent-address': agentAddress, 'x-agent-signature': signature, 'x-agent-challenge': challenge }
+          headers: { 'x-agent-id': agentAddress, 'x-agent-signature': signature, 'x-agent-challenge': challenge }
         });
         const secondResponse = await secondCall.json();
         console.log('Step 4 status:', secondCall.status, JSON.stringify(secondResponse).slice(0,200));
